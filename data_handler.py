@@ -1,4 +1,6 @@
 import tensorflow as tf
+import numpy as np
+import re
 
 class Data:
     def __init__(self, FLAGS):
@@ -6,7 +8,7 @@ class Data:
         # create vocab and reverse vocab maps
         self.vocab     = {}
         self.rev_vocab = {}
-        self.END_TOKEN = 1 
+        self.END_TOKEN = 1
         self.UNK_TOKEN = 2
         with open(FLAGS.vocab_filename) as f:
             for idx, line in enumerate(f):
@@ -15,39 +17,57 @@ class Data:
         self.vocab_size = len(self.vocab)
 
     def tokenize_and_map(self,line):
-        return [self.vocab.get(token, self.UNK_TOKEN) for token in line.split(' ')]
+        return [self.vocab.get(token, self.UNK_TOKEN) for token in line.split()]
 
 
-    def make_input_fn(self):
+    def make_input_fn(self, mode='train'):
         def input_fn():
-            inp = tf.placeholder(tf.int64, shape=[None, None], name='input')
-            output = tf.placeholder(tf.int64, shape=[None, None], name='output')
-            tf.identity(inp[0], 'source')
-            tf.identity(output[0], 'target')
-            return { 'input': inp, 'output': output}, None
+            inp = tf.placeholder(tf.int64, shape=[None, None], name='source')
+            output = tf.placeholder(tf.int64, shape=[None, None], name='target')
+            label = tf.placeholder(tf.float32, shape=[None,], name='label')
+            tf.identity(inp[0], 'source_ex')
+            tf.identity(output[0], 'target_ex')
+            return { 'source': inp, 'target': output, 'label': label}, None
 
-        def sampler():
+        def sampler(mode='train'):
+            file1, file2, file3 = self.FLAGS.input_filename, self.FLAGS.output_filename, self.FLAGS.shuffled_filename
+            if mode == 'test':
+                file1, file2, file3 = (re.sub('train', 'test', f) for f in (file1, file2, file3))
             while True:
-                with open(self.FLAGS.input_filename) as finput, open(self.FLAGS.output_filename) as foutput:
-                    for source,target in zip(finput, foutput):
-                        yield {
-                            'input': self.tokenize_and_map(source)[:self.FLAGS.input_max_length - 1] + [self.END_TOKEN],
-                            'output': self.tokenize_and_map(target)[:self.FLAGS.output_max_length - 1] + [self.END_TOKEN]}
+                with open(file1) as finput, \
+                     open(file2) as foutput, \
+                     open(file3) as fshuffled:
+                         for source, target, shuffled in zip(finput, foutput, fshuffled):
+                             label = 1
+                             if np.random.rand() < .5:
+                                 target = shuffled
+                                 label = 0
+                             if max(len(source.split()), len(target.split())) > self.FLAGS.max_length:
+                                 continue
+                             yield {
+                                'source': self.tokenize_and_map(source) + [self.END_TOKEN],
+                                'target': self.tokenize_and_map(target) + [self.END_TOKEN],
+                                'label': label
+                                }
 
-        data_feed = sampler()
+        data_feed = sampler(mode=mode)
+        
         def feed_fn():
-            source, target = [], []
+            source, target, label = [], [], []
             input_length, output_length = 0, 0
+            # max_length = 0
             for i in range(self.FLAGS.batch_size):
                 rec = data_feed.next()
-                source.append(rec['input'])
-                target.append(rec['output'])
+                label.append(rec['label'])
+                source.append(rec['source'])
+                target.append(rec['target'])
                 input_length = max(input_length, len(source[-1]))
                 output_length = max(output_length, len(target[-1]))
+                # max_length = max(max_length, len(source[-1]), len(target[-1]))
             for i in range(self.FLAGS.batch_size):
                 source[i] += [self.END_TOKEN] * (input_length - len(source[i]))
                 target[i] += [self.END_TOKEN] * (output_length - len(target[i]))
-            return { 'input:0': source, 'output:0': target }
+            return { 'source:0': source, 'target:0': target, 'label:0': label }
         return input_fn, feed_fn
 
     def get_formatter(self,keys):
@@ -62,4 +82,3 @@ class Data:
                 res.append("****%s == %s" % (key, to_str(values[key]).replace('</S>','').replace('<S>', '')))
             return '\n'+'\n'.join(res)
         return format
-

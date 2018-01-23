@@ -1,0 +1,6 @@
+.ipynb_checkpoints/*
+checkpoints/*
+checkpionts_new/*
+*.pyc
+experiments/*
+checkpoints_new/*
