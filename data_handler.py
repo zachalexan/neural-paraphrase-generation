@@ -25,8 +25,8 @@ class Data:
             inp = tf.placeholder(tf.int64, shape=[None, None], name='source')
             output = tf.placeholder(tf.int64, shape=[None, None], name='target')
             label = tf.placeholder(tf.float32, shape=[None,], name='label')
-            tf.identity(inp[0], 'source_ex')
-            tf.identity(output[0], 'target_ex')
+            tf.identity(inp[0], 'source')
+            # tf.identity(output[0], 'target_ex')
             return { 'source': inp, 'target': output, 'label': label}, None
 
         def sampler(mode='train'):
@@ -51,7 +51,7 @@ class Data:
                                 }
 
         data_feed = sampler(mode=mode)
-        
+
         def feed_fn():
             source, target, label = [], [], []
             input_length, output_length = 0, 0
