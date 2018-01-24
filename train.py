@@ -6,22 +6,24 @@ from seq2seq import Seq2seq
 from data_handler import Data
 
 from tensorflow.python import debug as tf_debug
+from tensorflow.contrib.learn import learn_runner
+
 
 
 FLAGS = tf.flags.FLAGS
 
 # Model related
 tf.flags.DEFINE_integer('num_units'         , 256           , 'Number of units in a LSTM cell')
-tf.flags.DEFINE_integer('embed_dim'         , 256           , 'Size of the embedding vector')
+tf.flags.DEFINE_integer('embed_dim'         , 100           , 'Size of the embedding vector')
 
 # Training related
 tf.flags.DEFINE_float('learning_rate'       , 0.001         , 'learning rate for the optimizer')
 tf.flags.DEFINE_string('optimizer'          , 'Adam'        , 'Name of the train source file')
 tf.flags.DEFINE_integer('batch_size'        , 32            , 'random seed for training sampling')
 tf.flags.DEFINE_integer('print_every'       , 100          , 'print records every n iteration')
-tf.flags.DEFINE_integer('iterations'        , 500         , 'number of iterations to train')
+tf.flags.DEFINE_integer('iterations'        , 2000         , 'number of iterations to train')
 tf.flags.DEFINE_string('model_dir'          , 'checkpoints' , 'Directory where to save the model')
-tf.flags.DEFINE_string('experiment_dir'          , 'experiments' , 'Directory where to save the experiment')
+tf.flags.DEFINE_string('experiment_dir'          , 'experiments_glove' , 'Directory where to save the experiment')
 
 tf.flags.DEFINE_integer('input_max_length'  , 30            , 'Max length of input sequence to use')
 tf.flags.DEFINE_integer('output_max_length' , 30            , 'Max length of output sequence to use')
@@ -33,7 +35,7 @@ tf.flags.DEFINE_string('input_filename', 'data/mscoco/train_source.txt', 'Name o
 tf.flags.DEFINE_string('output_filename', 'data/mscoco/train_target.txt', 'Name of the train target file')
 tf.flags.DEFINE_string('vocab_filename', 'data/mscoco/train_vocab.txt', 'Name of the vocab file')
 tf.flags.DEFINE_string('shuffled_filename', 'data/mscoco/train_target_shuffled.txt', 'Name of shuffled targets')
-
+tf.flags.DEFINE_string('word_vectors', '../data/glove/glove.6B.100d.txt', 'Name of word vectors file')
 
 def run_experiment(argv=None):
 
@@ -47,8 +49,9 @@ def run_experiment(argv=None):
 
 def experiment_fn(run_config, params):
     data = Data(FLAGS)
+    data.initialize_word_vectors()
 
-    model = Seq2seq(data.vocab_size, FLAGS)
+    model = Seq2seq(data.vocab_size, FLAGS, data.embeddings_mat)
     estimator = tf.estimator.Estimator(model_fn=model.make_graph,
 #                                        model_dir=FLAGS.model_dir,
                                        config=run_config,

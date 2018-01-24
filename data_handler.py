@@ -16,6 +16,33 @@ class Data:
                 self.rev_vocab[idx] = line.strip()
         self.vocab_size = len(self.vocab)
 
+    def _random_word_vec(self, dim):
+        x = [np.random.laplace() for i in range(dim)]
+        x = np.clip(np.array(x) * .4, -1, 1)
+        return x
+
+    def initialize_word_vectors(self):
+        # Load GLOVE vectors
+        words = set(self.vocab.keys())
+        embeddings_dict = {}
+        with open(self.FLAGS.word_vectors) as f:
+            for line in f:
+                vec = line.split()
+                word = vec[0]
+                if word in words:
+                    coefs = np.asarray(vec[1:], dtype='float64')
+                    embeddings_dict[word] = coefs
+        embed_words = set(embeddings_dict.keys())
+
+        # Initialize matrix
+        self.embeddings_mat = np.zeros((self.vocab_size, self.FLAGS.embed_dim))
+        for key, val in self.vocab.iteritems():
+            if key in embed_words:
+                self.embeddings_mat[val] = embeddings_dict[key]
+            else:
+                self.embeddings_mat[val] = self._random_word_vec(self.FLAGS.embed_dim)
+        self.embeddings_mat = np.transpose(self.embeddings_mat)
+
     def tokenize_and_map(self,line):
         return [self.vocab.get(token, self.UNK_TOKEN) for token in line.split()]
 
@@ -72,8 +99,10 @@ class Data:
 
     def get_formatter(self,keys):
         def to_str(sequence):
-            tokens = [
-                self.rev_vocab.get(x, "<UNK>") for x in sequence]
+            try:
+                tokens = [self.rev_vocab.get(x, "<UNK>") for x in sequence.tolist()]
+            except:
+                tokens = [self.rev_vocab.get(x, "<UNK>") for x in sequence[0].tolist()]
             return ' '.join(tokens)
 
         def format(values):

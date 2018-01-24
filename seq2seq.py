@@ -2,18 +2,30 @@ import tensorflow as tf
 from tensorflow.contrib import layers
 
 class Seq2seq:
-    def __init__(self, vocab_size, FLAGS):
+    def __init__(self, vocab_size, FLAGS, embeddings=None):
         self.FLAGS = FLAGS
         self.vocab_size = vocab_size
+        self.embeddings_mat = embeddings
 
         # Encoding
     def encode(self, seq, reuse=None):
         # input_lengths  = tf.reduce_sum(tf.to_int32(tf.not_equal(seq, 1)), 1)
-        input_embed    = layers.embed_sequence(seq,
-                                               vocab_size=self.vocab_size,
-                                               embed_dim = self.embed_dim,
-                                               scope = 'embed',
-                                               reuse = reuse)
+        if self.embeddings_mat is not None:
+            input_embed = layers.embed_sequence(
+                        seq,
+                        vocab_size=self.vocab_size,
+                        embed_dim = self.embed_dim,
+                        initializer = tf.constant_initializer(self.embeddings_mat, dtype=tf.float32),
+                        trainable = False,
+                        scope = 'embed',
+                        reuse = reuse
+                        )
+        else:
+            input_embed    = layers.embed_sequence(seq,
+                                                   vocab_size=self.vocab_size,
+                                                   embed_dim = self.embed_dim,
+                                                   scope = 'embed',
+                                                   reuse = reuse)
         cell = tf.contrib.rnn.LSTMCell(num_units=self.num_units, reuse=reuse)
         # if self.FLAGS.use_residual_lstm:
         #     cell = tf.contrib.rnn.ResidualWrapper(cell)
@@ -82,6 +94,22 @@ class Seq2seq:
                             weights=weights)
             return loss
 
+    def sampled_seq_loss(self, decoding, actual):
+        """
+        This doesn't work
+        """
+        with tf.variable_scope('decode/decoder/output_projection_wrapper', reuse=True) as scope:
+            kernel = tf.get_variable('kernel')
+            bias = tf.get_variable('bias')
+        return tf.nn.sampled_softmax_loss(
+            tf.transpose(kernel),
+            bias,
+            tf.reshape(decoding.rnn_output, [-1, self.vocab_size]),
+            tf.cast(tf.reshape(actual, [-1, 1]), dtype=tf.float32),
+            num_sampled=512,
+            num_classes=self.vocab_size
+        )
+
     def sim_loss(self, enc1, enc2, label):
         scores = tf.sigmoid(tf.reduce_sum(tf.multiply(enc1, enc2), axis=1))
         loss = - tf.reduce_mean(label * tf.log(scores + .0001) + (1 - label) * tf.log(1 - scores + .001))
@@ -109,6 +137,11 @@ class Seq2seq:
         train_output_target = self.decode(target_encoder_out, 'decode', target, reuse=True)
         pred_output_source = self.decode(source_encoder_out, 'decode', mode='predict', reuse=True)
         pred_output_target = self.decode(target_encoder_out, 'decode', mode='predict', reuse=True)
+
+
+
+        ############# Debug ##############
+        # return train_output_source, source, target, label
 
         # Loss
         # tf.Print(train_output_source, [train_output_source.rnn_output[0]])
