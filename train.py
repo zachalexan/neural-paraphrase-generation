@@ -1,5 +1,5 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import logging
 import tensorflow as tf
 from seq2seq import Seq2seq
@@ -7,7 +7,7 @@ from data_handler import Data
 
 from tensorflow.python import debug as tf_debug
 from tensorflow.contrib.learn import learn_runner
-
+tf.logging.set_verbosity(tf.logging.INFO)
 
 
 FLAGS = tf.flags.FLAGS
@@ -21,9 +21,9 @@ tf.flags.DEFINE_float('learning_rate'       , 0.001         , 'learning rate for
 tf.flags.DEFINE_string('optimizer'          , 'Adam'        , 'Name of the train source file')
 tf.flags.DEFINE_integer('batch_size'        , 32            , 'random seed for training sampling')
 tf.flags.DEFINE_integer('print_every'       , 100          , 'print records every n iteration')
-tf.flags.DEFINE_integer('iterations'        , 2000         , 'number of iterations to train')
-tf.flags.DEFINE_string('model_dir'          , 'checkpoints' , 'Directory where to save the model')
-tf.flags.DEFINE_string('experiment_dir'          , 'experiments_glove' , 'Directory where to save the experiment')
+tf.flags.DEFINE_integer('iterations'        , 10000         , 'number of iterations to train')
+# tf.flags.DEFINE_string('model_dir'          , 'checkpoints' , 'Directory where to save the model')
+tf.flags.DEFINE_string('experiment_dir'          , 'experiments_scrambled_input' , 'Directory where to save the experiment')
 
 tf.flags.DEFINE_integer('input_max_length'  , 30            , 'Max length of input sequence to use')
 tf.flags.DEFINE_integer('output_max_length' , 30            , 'Max length of output sequence to use')
@@ -36,6 +36,15 @@ tf.flags.DEFINE_string('output_filename', 'data/mscoco/train_target.txt', 'Name 
 tf.flags.DEFINE_string('vocab_filename', 'data/mscoco/train_vocab.txt', 'Name of the vocab file')
 tf.flags.DEFINE_string('shuffled_filename', 'data/mscoco/train_target_shuffled.txt', 'Name of shuffled targets')
 tf.flags.DEFINE_string('word_vectors', '../data/glove/glove.6B.100d.txt', 'Name of word vectors file')
+tf.flags.DEFINE_float('remove_word_prob'       , 0.05         , 'Probability of dropping each word in the source')
+tf.flags.DEFINE_float('swap_words_prob'       , 0.05       , 'Probability of swapping adjacent words in the source')
+
+
+
+def inference_fn():
+    data = Data(FLAGS)
+    data.initialize_word_vectors()
+    model = Seq2seq(data.vocab_size, FLAGS, data.embeddings_mat)
 
 def run_experiment(argv=None):
 

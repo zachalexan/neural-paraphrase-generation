@@ -120,34 +120,36 @@ class Seq2seq:
         self.num_units = params.num_units
 
         # Data
-        source, target, label   = features['source'], features['target'], features['label']
-        self.batch_size     = tf.shape(source)[0]
+        source_in, source_out = features['source_in'], features['source_out']
+        target_in, target_out = features['target_in'], features['target_out']
+        label = features['label']
+        self.batch_size     = tf.shape(source_in)[0]
         self.start_tokens   = tf.zeros([self.batch_size], dtype= tf.int64)
 
         with tf.variable_scope('encode'):
-            source_encoder_out = self.encode(source)
-            target_encoder_out = self.encode(target, reuse=True)
+            source_encoder_out = self.encode(source_in)
+            target_encoder_out = self.encode(target_in, reuse=True)
 
         # Save embeddings
         with tf.variable_scope('encode/embed', reuse=True):
             self.embeddings = tf.get_variable('embeddings')
 
         # Decode
-        train_output_source = self.decode(source_encoder_out, 'decode', source)
-        train_output_target = self.decode(target_encoder_out, 'decode', target, reuse=True)
+        train_output_source = self.decode(source_encoder_out, 'decode', source_out)
+        train_output_target = self.decode(target_encoder_out, 'decode', target_out, reuse=True)
         pred_output_source = self.decode(source_encoder_out, 'decode', mode='predict', reuse=True)
         pred_output_target = self.decode(target_encoder_out, 'decode', mode='predict', reuse=True)
 
 
 
         ############# Debug ##############
-        # return train_output_source, source, target, label
+        # return train_output_source, source_in, source_out, target_in, target_out, label
 
         # Loss
         # tf.Print(train_output_source, [train_output_source.rnn_output[0]])
-        tf.Print(source, [source])
-        source_loss = self.seq_loss(train_output_source, source)
-        target_loss = self.seq_loss(train_output_target, target)
+        # tf.Print(source, [source])
+        source_loss = self.seq_loss(train_output_source, source_out)
+        target_loss = self.seq_loss(train_output_target, target_out)
         sim_loss = self.sim_loss(source_encoder_out[1],
                                  target_encoder_out[1],
                                  label)
