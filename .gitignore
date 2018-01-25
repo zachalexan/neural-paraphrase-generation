@@ -1,0 +1,10 @@
+.ipynb_checkpoints/*
+checkpoints/*
+checkpionts_new/*
+*.pyc
+experiments/*
+checkpoints_new/*
+experiments_glove/*
+experiments_glove_v2/*
+experiments_glove_2/*
+experiments_*
