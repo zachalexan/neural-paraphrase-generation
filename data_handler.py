@@ -159,8 +159,7 @@ class Data:
                 'source_out:0': phrases['source_out'],
                 'target_in:0': phrases['target_in'],
                 'target_out:0': phrases['target_out'],
-                'label:0': label
-                }
+                'label:0': label}
         return input_fn, feed_fn
 
     def get_formatter(self,keys):

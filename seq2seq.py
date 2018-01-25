@@ -2,10 +2,11 @@ import tensorflow as tf
 from tensorflow.contrib import layers
 
 class Seq2seq:
-    def __init__(self, vocab_size, FLAGS, embeddings=None):
+    def __init__(self, vocab_size, FLAGS, embeddings=None, sigma=0):
         self.FLAGS = FLAGS
         self.vocab_size = vocab_size
         self.embeddings_mat = embeddings
+        self.sigma = sigma
 
         # Encoding
     def encode(self, seq, reuse=None):
@@ -34,25 +35,20 @@ class Seq2seq:
         return encoder_final_state, encoder_final_state_vec
         # return encoder_outputs, encoder_final_state, input_lengths
 
-    def get_paraphrase(self, encoder_out, scope):
+    def get_paraphrase(self, encoder_out, scope, sigma):
 
         # From the encoder
         encoder_state = encoder_out[0]
-        # encoder_state_vec = encoder_out[1]
 
         # Add some noise
-        sigma = 0.15
-        # noise = tf.random_normal(tf.shape(encoder_state_vec), stddev=sigma)
-        # encoder_state_vec = encoder_state_vec + noise
-        # encoder_state_vec = tf.reshape(encoder_state_vec[)
         noise1 = tf.random_normal(tf.shape(encoder_state[0]), stddev=sigma)
         noise2 = tf.random_normal(tf.shape(encoder_state[1]), stddev=sigma)
-        # encoder_state[0], encoder_state[1] = encoder_state[0] + noise1, encoder_state[1] + noise2
         new_encoder_state = tf.nn.rnn_cell.LSTMStateTuple(
             c=encoder_state[0] + noise1,
             h=encoder_state[1] + noise2
         )
 
+        # Helper
         helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
             self.embeddings,
             start_tokens=tf.to_int32(self.start_tokens),
@@ -71,38 +67,33 @@ class Seq2seq:
                 impute_finished=True, maximum_iterations=self.FLAGS.output_max_length + 1)
             return outputs[0]
 
-
-
-
-
-    def decode(self, encoder_out, scope, output=None, mode='train', reuse=None):
+    def decode(self, encoder_out, scope, output, reuse=None):
 
         # From the encoder
-        # encoder_outputs = encoder_out[0]
         encoder_state = encoder_out[0]
-        # input_lengths = encoder_out[2]
 
         # Perform the embedding
-        if mode=='train':
-            if output is None:
-                raise Exception('output must be provided for mode=train')
-            train_output   = tf.concat([tf.expand_dims(self.start_tokens, 1), output], 1)
-            output_lengths = tf.reduce_sum(tf.to_int32(tf.not_equal(train_output, 1)), 1)
-            output_embed   = layers.embed_sequence(
-                train_output,
-                vocab_size=self.vocab_size,
-                embed_dim = self.embed_dim,
-                scope = 'encode/embed', reuse = True)
+        # if mode=='train':
+        #     if output is None:
+        #         raise Exception('output must be provided for mode=train')
+        train_output   = tf.concat([tf.expand_dims(self.start_tokens, 1), output], 1)
+        output_lengths = tf.reduce_sum(tf.to_int32(tf.not_equal(train_output, 1)), 1)
+        output_embed   = layers.embed_sequence(
+            train_output,
+            vocab_size=self.vocab_size,
+            embed_dim = self.embed_dim,
+            scope = 'encode/embed', reuse = True)
 
         # Prepare the helper
-        if mode=='train':
-            helper = tf.contrib.seq2seq.TrainingHelper(output_embed, output_lengths)
-        if mode=='predict':
-            helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-                self.embeddings,
-                start_tokens=tf.to_int32(self.start_tokens),
-                end_token=1
-                )
+        # if mode=='train':
+        #     helper = tf.contrib.seq2seq.TrainingHelper(output_embed, output_lengths)
+        # if mode=='predict':
+        #     helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+        #         self.embeddings,
+        #         start_tokens=tf.to_int32(self.start_tokens),
+        #         end_token=1
+        #         )
+        helper = tf.contrib.seq2seq.TrainingHelper(output_embed, output_lengths)
 
         # Decoder is partially based on @ilblackdragon//tf_example/seq2seq.py
         with tf.variable_scope(scope, reuse=reuse):
@@ -164,6 +155,7 @@ class Seq2seq:
         source_in, source_out = features['source_in'], features['source_out']
         target_in, target_out = features['target_in'], features['target_out']
         label = features['label']
+
         self.batch_size     = tf.shape(source_in)[0]
         self.start_tokens   = tf.zeros([self.batch_size], dtype= tf.int64)
 
@@ -180,7 +172,7 @@ class Seq2seq:
         train_output_target = self.decode(target_encoder_out, 'decode', target_out, reuse=True)
         # pred_output_source = self.decode(source_encoder_out, 'decode', mode='predict', reuse=True)
         # pred_output_target = self.decode(target_encoder_out, 'decode', mode='predict', reuse=True)
-        pred_output_source = self.get_paraphrase(source_encoder_out, 'decode')
+        pred_output_source = self.get_paraphrase(source_encoder_out, 'decode', self.sigma)
 
 
 
