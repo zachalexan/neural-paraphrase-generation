@@ -34,6 +34,47 @@ class Seq2seq:
         return encoder_final_state, encoder_final_state_vec
         # return encoder_outputs, encoder_final_state, input_lengths
 
+    def get_paraphrase(self, encoder_out, scope):
+
+        # From the encoder
+        encoder_state = encoder_out[0]
+        # encoder_state_vec = encoder_out[1]
+
+        # Add some noise
+        sigma = 0.15
+        # noise = tf.random_normal(tf.shape(encoder_state_vec), stddev=sigma)
+        # encoder_state_vec = encoder_state_vec + noise
+        # encoder_state_vec = tf.reshape(encoder_state_vec[)
+        noise1 = tf.random_normal(tf.shape(encoder_state[0]), stddev=sigma)
+        noise2 = tf.random_normal(tf.shape(encoder_state[1]), stddev=sigma)
+        # encoder_state[0], encoder_state[1] = encoder_state[0] + noise1, encoder_state[1] + noise2
+        new_encoder_state = tf.nn.rnn_cell.LSTMStateTuple(
+            c=encoder_state[0] + noise1,
+            h=encoder_state[1] + noise2
+        )
+
+        helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+            self.embeddings,
+            start_tokens=tf.to_int32(self.start_tokens),
+            end_token=1
+            )
+
+        # Decoder is partially based on @ilblackdragon//tf_example/seq2seq.py
+        with tf.variable_scope(scope, reuse=True):
+            cell = tf.contrib.rnn.LSTMCell(num_units=self.num_units)
+            out_cell = tf.contrib.rnn.OutputProjectionWrapper(cell, self.vocab_size, reuse=True)
+            decoder = tf.contrib.seq2seq.BasicDecoder(
+                cell=out_cell, helper=helper,
+                initial_state=new_encoder_state)
+            outputs = tf.contrib.seq2seq.dynamic_decode(
+                decoder=decoder, output_time_major=False,
+                impute_finished=True, maximum_iterations=self.FLAGS.output_max_length + 1)
+            return outputs[0]
+
+
+
+
+
     def decode(self, encoder_out, scope, output=None, mode='train', reuse=None):
 
         # From the encoder
@@ -137,8 +178,9 @@ class Seq2seq:
         # Decode
         train_output_source = self.decode(source_encoder_out, 'decode', source_out)
         train_output_target = self.decode(target_encoder_out, 'decode', target_out, reuse=True)
-        pred_output_source = self.decode(source_encoder_out, 'decode', mode='predict', reuse=True)
-        pred_output_target = self.decode(target_encoder_out, 'decode', mode='predict', reuse=True)
+        # pred_output_source = self.decode(source_encoder_out, 'decode', mode='predict', reuse=True)
+        # pred_output_target = self.decode(target_encoder_out, 'decode', mode='predict', reuse=True)
+        pred_output_source = self.get_paraphrase(source_encoder_out, 'decode')
 
 
 
