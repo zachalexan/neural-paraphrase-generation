@@ -21,7 +21,7 @@ tf.flags.DEFINE_float('learning_rate'       , 0.001         , 'learning rate for
 tf.flags.DEFINE_string('optimizer'          , 'Adam'        , 'Name of the train source file')
 tf.flags.DEFINE_integer('batch_size'        , 32            , 'random seed for training sampling')
 tf.flags.DEFINE_integer('print_every'       , 100          , 'print records every n iteration')
-tf.flags.DEFINE_integer('iterations'        , 10000         , 'number of iterations to train')
+tf.flags.DEFINE_integer('iterations'        , 30000         , 'number of iterations to train')
 # tf.flags.DEFINE_string('model_dir'          , 'checkpoints' , 'Directory where to save the model')
 tf.flags.DEFINE_string('experiment_dir'          , 'experiments_scrambled_input' , 'Directory where to save the experiment')
 

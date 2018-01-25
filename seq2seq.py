@@ -30,7 +30,7 @@ class Seq2seq:
         # if self.FLAGS.use_residual_lstm:
         #     cell = tf.contrib.rnn.ResidualWrapper(cell)
         encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(cell, input_embed, dtype=tf.float32)
-        encoder_final_state_vec = tf.concat(encoder_final_state, 1)
+        encoder_final_state_vec = tf.nn.l2_normalize(tf.concat(encoder_final_state, 1), 1)
         return encoder_final_state, encoder_final_state_vec
         # return encoder_outputs, encoder_final_state, input_lengths
 
