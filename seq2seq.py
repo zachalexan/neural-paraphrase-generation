@@ -27,12 +27,21 @@ class Seq2seq:
                                                    embed_dim = self.embed_dim,
                                                    scope = 'embed',
                                                    reuse = reuse)
-        cell = tf.contrib.rnn.LSTMCell(num_units=self.num_units, reuse=reuse)
-        # if self.FLAGS.use_residual_lstm:
-        #     cell = tf.contrib.rnn.ResidualWrapper(cell)
-        encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(cell, input_embed, dtype=tf.float32)
-        encoder_final_state_vec = tf.nn.l2_normalize(tf.concat(encoder_final_state, 1), 1)
-        return encoder_final_state, encoder_final_state_vec
+        with tf.variable_scope('forward') as scope:
+            forward_cell = tf.contrib.rnn.LSTMCell(num_units=self.num_units / 2, reuse=reuse)
+        with tf.variable_scope('backward') as scope:
+            backward_cell = tf.contrib.rnn.LSTMCell(num_units=self.num_units / 2, reuse=reuse)
+        # encoder_outputs, encoder_final_state = tf.nn.dynamic_rnn(cell, input_embed, dtype=tf.float32)
+        # encoder_final_state_vec = tf.nn.l2_normalize(tf.concat(encoder_final_state, 1), 1)
+        encoder_outputs, encoder_states = tf.nn.bidirectional_dynamic_rnn(
+            forward_cell, backward_cell, input_embed, dtype=tf.float32
+        )
+        encoder_states = tf.nn.rnn_cell.LSTMStateTuple(
+            c = tf.concat((encoder_states[0][0], encoder_states[1][0]), 1),
+            h = tf.concat((encoder_states[0][1], encoder_states[1][1]), 1)
+        )
+        encoder_final_state_vec = tf.nn.l2_normalize(tf.concat(encoder_states, 1), 1)
+        return encoder_states, encoder_final_state_vec
         # return encoder_outputs, encoder_final_state, input_lengths
 
     def get_paraphrase(self, encoder_out, scope, sigma):
@@ -177,55 +186,55 @@ class Seq2seq:
 
 
         ############# Debug ##############
-        # return train_output_source, source_in, source_out, target_in, target_out, label
+        return train_output_source, source_in, source_out, target_in, target_out, label
 
-        # Loss
-        # tf.Print(train_output_source, [train_output_source.rnn_output[0]])
-        # tf.Print(source, [source])
-        source_loss = self.seq_loss(train_output_source, source_out)
-        target_loss = self.seq_loss(train_output_target, target_out)
-        sim_loss = self.sim_loss(source_encoder_out[1],
-                                 target_encoder_out[1],
-                                 label)
-
-        loss = source_loss + target_loss + sim_loss
-        # loss = source_loss
-
-
-
-        ########## Debug #################################
-        # return train_output_source, loss, source, target, label
-        ##################################################
-
-
-
-        tf.summary.scalar('source_loss', source_loss)
-        tf.summary.scalar('target_loss', target_loss)
-        tf.summary.scalar('sim_loss', sim_loss)
-        eval_metrics = {
-            'source_loss': tf.contrib.metrics.streaming_mean(source_loss),
-            'target_loss': tf.contrib.metrics.streaming_mean(target_loss),
-            'sim_loss': tf.contrib.metrics.streaming_mean(sim_loss)
-            }
-        # + sim_loss
-        # For logging
-        # tf.identity(train_outputs.sample_id[0], name='train_pred')
-
-        # train_output = tf.concat([tf.expand_dims(self.start_tokens, 1), source], 1)
-        # weights = tf.to_float(tf.not_equal(train_output[:, :-1], 1))
-        # loss = tf.contrib.seq2seq.sequence_loss(train_outputs.rnn_output, source, weights=weights)
-        train_op = layers.optimize_loss(
-            loss, tf.train.get_global_step(),
-            optimizer=params.optimizer,
-            learning_rate=params.learning_rate,
-            summaries=['loss', 'learning_rate'])
-
+        # # Loss
+        # # tf.Print(train_output_source, [train_output_source.rnn_output[0]])
+        # # tf.Print(source, [source])
+        # source_loss = self.seq_loss(train_output_source, source_out)
+        # target_loss = self.seq_loss(train_output_target, target_out)
+        # sim_loss = self.sim_loss(source_encoder_out[1],
+        #                          target_encoder_out[1],
+        #                          label)
+        #
+        # # loss = source_loss + target_loss + sim_loss
+        # loss = source_loss + sim_loss
+        #
+        #
+        #
+        # ########## Debug #################################
+        # # return train_output_source, loss, source, target, label
+        # ##################################################
+        #
+        #
+        #
+        # tf.summary.scalar('source_loss', source_loss)
+        # # tf.summary.scalar('target_loss', target_loss)
+        # tf.summary.scalar('sim_loss', sim_loss)
+        # eval_metrics = {
+        #     'source_loss': tf.contrib.metrics.streaming_mean(source_loss),
+        #     'target_loss': tf.contrib.metrics.streaming_mean(target_loss),
+        #     'sim_loss': tf.contrib.metrics.streaming_mean(sim_loss)
+        #     }
+        # # + sim_loss
+        # # For logging
+        # # tf.identity(train_outputs.sample_id[0], name='train_pred')
+        #
+        # # train_output = tf.concat([tf.expand_dims(self.start_tokens, 1), source], 1)
+        # # weights = tf.to_float(tf.not_equal(train_output[:, :-1], 1))
+        # # loss = tf.contrib.seq2seq.sequence_loss(train_outputs.rnn_output, source, weights=weights)
+        # train_op = layers.optimize_loss(
+        #     loss, tf.train.get_global_step(),
+        #     optimizer=params.optimizer,
+        #     learning_rate=params.learning_rate,
+        #     summaries=['loss', 'learning_rate'])
+        #
+        # # tf.identity(pred_output_source.sample_id[0], name='predict')
         # tf.identity(pred_output_source.sample_id[0], name='predict')
-        tf.identity(pred_output_source.sample_id[0], name='predict')
-        return tf.estimator.EstimatorSpec(
-            mode=mode,
-            predictions=pred_output_source.sample_id,
-            loss=loss,
-            train_op=train_op,
-            eval_metric_ops=eval_metrics
-        )
+        # return tf.estimator.EstimatorSpec(
+        #     mode=mode,
+        #     predictions=pred_output_source.sample_id,
+        #     loss=loss,
+        #     train_op=train_op,
+        #     eval_metric_ops=eval_metrics
+        # )
