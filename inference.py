@@ -31,9 +31,12 @@ def predict_feed_fn(phrase):
     tokens = data.tokenize_and_map(phrase, mode='test') + [data.END_TOKEN]
     def feed_fn():
         return {
-        'source_in:0': [tokens]}
+        'source_in:0': [tokens]
+        }
     return feed_fn
 
-def predict_paraphrase(phrase):
+def predict_paraphrase(phrase, sigma):
+
+    model.sigma = sigma
     preds = estimator.predict(input_fn=input_fn, hooks=[tf.train.FeedFnHook(predict_feed_fn(phrase))])
     return format_fn(preds.next())
